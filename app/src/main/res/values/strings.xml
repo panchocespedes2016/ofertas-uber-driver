@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Evidencia de ofertas</string>
+    <string name="accessibility_description">Detecta texto de ofertas visibles en Uber Driver y guarda una captura local con fecha y huella SHA-256.</string>
+</resources>
