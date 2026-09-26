@@ -36,7 +36,6 @@ import kotlin.math.roundToInt
 class OfferCaptureService : AccessibilityService() {
     companion object {
         const val ACTION_MANUAL = "com.eu.ofertasevidencia.CAPTURE_NOW"
-        const val ACTION_DISABLE_SELF = "com.eu.ofertasevidencia.DISABLE_SELF"
         private const val CHANNEL_ID = "capture_status"
         private const val NOTIFICATION_ID = 1107
         const val PREFS = "evidencia_prefs"
@@ -70,14 +69,13 @@ class OfferCaptureService : AccessibilityService() {
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == "bubble_size_dp" || key == "bubble_alpha_pct") applyBubbleAppearance()
             if (key == "bubble_enabled") setBubbleVisible(true)
+            if (key == "auto_enabled") showStatusNotification()
         }
 
     private val manualReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == ACTION_MANUAL) {
                 handler.postDelayed({ inspectCurrentWindow(automatic = false) }, 700)
-            } else if (intent?.action == ACTION_DISABLE_SELF) {
-                disableSelf()
             }
         }
     }
@@ -89,7 +87,7 @@ class OfferCaptureService : AccessibilityService() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         setBubbleVisible(true)
-        val filter = IntentFilter(ACTION_MANUAL).apply { addAction(ACTION_DISABLE_SELF) }
+        val filter = IntentFilter(ACTION_MANUAL)
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             registerReceiver(manualReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -107,6 +105,8 @@ class OfferCaptureService : AccessibilityService() {
             setBubbleVisible(true)
         }
         if (!isUberDriverPackage(packageName)) return
+        // La captura automática se puede pausar desde Config sin apagar el servicio
+        if (!prefs.getBoolean("auto_enabled", true)) return
         pendingCheck?.let(handler::removeCallbacks)
         pendingCheck = Runnable { inspectCurrentWindow(automatic = true) }.also {
             handler.postDelayed(it, 550)
@@ -409,9 +409,10 @@ class OfferCaptureService : AccessibilityService() {
         val action = PendingIntent.getBroadcast(
             this, 7, actionIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val autoOn = prefs.getBoolean("auto_enabled", true)
         val notification = android.app.Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(com.eu.ofertasevidencia.R.drawable.ic_evidence)
-            .setContentTitle("Captura de ofertas activa")
+            .setContentTitle(if (autoOn) "Captura de ofertas activa" else "Captura automática pausada")
             .setContentText("Las evidencias se guardan solo en este dispositivo")
             .setOngoing(true)
             .addAction(android.R.drawable.ic_menu_camera, "Capturar ahora", action)

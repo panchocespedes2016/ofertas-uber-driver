@@ -33,10 +33,12 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        statusText.text = if (isCaptureServiceEnabled()) {
-            "✓ Captura automática activada. Abre Uber Driver y mantén visible la oferta."
-        } else {
-            "Captura desactivada. Pulsa el botón y activa “Capturar ofertas de Uber Driver”."
+        val serviceOn = isCaptureServiceEnabled()
+        val autoOn = prefs.getBoolean("auto_enabled", true)
+        statusText.text = when {
+            serviceOn && autoOn -> "✓ Captura automática activada. Abre Uber Driver y mantén visible la oferta."
+            serviceOn -> "Captura automática pausada. Actívala en Config."
+            else -> "Captura desactivada. Pulsa el botón y activa “Capturar ofertas de Uber Driver”."
         }
     }
 

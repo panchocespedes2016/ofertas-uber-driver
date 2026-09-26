@@ -43,15 +43,16 @@ class ConfigActivity : Activity() {
         alphaLabel = findViewById(R.id.alphaLabel)
         alphaSeek = findViewById(R.id.alphaSeek)
 
-        // Apagar la captura automática se hace por código (el servicio se
-        // desactiva solo); encenderla sí exige los Ajustes del sistema.
-        // El botón flotante sí tiene interruptor propio: no hace falta quitar permisos.
+        // "Captura automática" y "Botón flotante" son interruptores independientes:
+        // pausan su función sin apagar el servicio ni quitar permisos.
+        // Solo si el servicio está desactivado en el sistema se abren los Ajustes.
         autoSwitch.setOnClickListener {
-            if (isCaptureServiceEnabled()) {
-                sendBroadcast(Intent(OfferCaptureService.ACTION_DISABLE_SELF).setPackage(packageName))
-                autoSwitch.isChecked = false
-            } else {
+            if (!isCaptureServiceEnabled()) {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            } else {
+                val enabled = !prefs.getBoolean("auto_enabled", true)
+                prefs.edit().putBoolean("auto_enabled", enabled).apply()
+                autoSwitch.isChecked = enabled
             }
         }
         bubbleSwitch.setOnClickListener {
@@ -94,7 +95,7 @@ class ConfigActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        autoSwitch.isChecked = isCaptureServiceEnabled()
+        autoSwitch.isChecked = isCaptureServiceEnabled() && prefs.getBoolean("auto_enabled", true)
         bubbleSwitch.isChecked = Settings.canDrawOverlays(this) && prefs.getBoolean("bubble_enabled", true)
         val sizeDp = prefs.getInt("bubble_size_dp", 56)
         sizeSeek.progress = sizeDp - 32
