@@ -29,6 +29,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
@@ -77,9 +78,41 @@ class OfferCaptureService : AccessibilityService() {
     private fun recognizeText(bitmap: Bitmap, onResult: (String) -> Unit) {
         runCatching {
             ocrClient.process(InputImage.fromBitmap(bitmap, 0))
-                .addOnSuccessListener { visionText -> onResult(visionText.text) }
+                .addOnSuccessListener { visionText -> onResult(offerCardText(visionText)) }
                 .addOnFailureListener { onResult("") }
         }.onFailure { onResult("") }
+    }
+
+    // Anclas de la tarjeta de oferta: la insignia "UberX" marca el borde superior
+    // y el botón "Accept"/"Aceptar" el borde inferior. Todo lo que esté fuera
+    // (p. ej. los textos del mapa) se ignora.
+    private val offerTopAnchor = Regex("\\bUber[A-Za-z]*\\b", RegexOption.IGNORE_CASE)
+    private val offerBottomAnchor = Regex("\\b(Accept|Aceptar)\\b", RegexOption.IGNORE_CASE)
+
+    /**
+     * Devuelve solo el texto dentro de la tarjeta de oferta: desde la insignia
+     * "UberX" hasta el botón "Accept". Si no encuentra las anclas, devuelve el
+     * texto completo (comportamiento anterior) para no perder datos.
+     */
+    private fun offerCardText(visionText: Text): String {
+        val blocks = visionText.textBlocks
+        if (blocks.isEmpty()) return visionText.text
+        var topY = -1
+        var bottomY = -1
+        for (block in blocks) {
+            val box = block.boundingBox ?: continue
+            if (topY < 0 && offerTopAnchor.containsMatchIn(block.text)) topY = box.top
+            if (offerBottomAnchor.containsMatchIn(block.text)) {
+                if (box.bottom > bottomY) bottomY = box.bottom
+            }
+        }
+        if (topY < 0) return visionText.text
+        val margin = 8
+        val kept = blocks.filter { block ->
+            val box = block.boundingBox ?: return@filter false
+            box.top >= topY - margin && (bottomY < 0 || box.top <= bottomY + margin)
+        }
+        return kept.joinToString("\n") { it.text }.ifBlank { visionText.text }
     }
     private var touchDownX = 0f
     private var touchDownY = 0f
