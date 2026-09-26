@@ -72,7 +72,7 @@ class OfferCaptureService : AccessibilityService() {
     private var bubbleExpandedExtra = 0
 
     // OCR en el teléfono: lee la oferta de la imagen porque Uber no expone texto
-    private val ocrClient by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT) }
+    private val ocrClient by lazy { TextRecognition.getClient(TextRecognizerOptions.Builder().build()) }
 
     private fun recognizeText(bitmap: Bitmap, onResult: (String) -> Unit) {
         runCatching {
