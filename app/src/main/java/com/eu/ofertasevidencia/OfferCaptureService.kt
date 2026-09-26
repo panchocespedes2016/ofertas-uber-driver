@@ -97,7 +97,8 @@ class OfferCaptureService : AccessibilityService() {
         val packageName = event?.packageName?.toString() ?: return
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             lastForegroundPackage = packageName
-            setBubbleVisible(isUberDriverPackage(packageName))
+            // Siempre visible sobre cualquier app mientras el servicio esté activo
+            setBubbleVisible(true)
         }
         if (!isUberDriverPackage(packageName)) return
         pendingCheck?.let(handler::removeCallbacks)
@@ -216,12 +217,12 @@ class OfferCaptureService : AccessibilityService() {
             inspectCurrentWindow(automatic = false) { analysis ->
                 if (analysis?.isOffer == true) {
                     tapAcceptRandom()
-                } else {
+                } else if (analysis != null) {
                     Toast.makeText(this, "Captura guardada", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Abre una oferta de Uber Driver y toca el botón", Toast.LENGTH_SHORT).show()
                 }
-                handler.postDelayed({
-                    setBubbleVisible(isUberDriverPackage(lastForegroundPackage ?: ""))
-                }, 400)
+                handler.postDelayed({ setBubbleVisible(true) }, 400)
             }
         }, 150)
     }
