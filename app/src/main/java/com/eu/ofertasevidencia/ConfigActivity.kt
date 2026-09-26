@@ -43,15 +43,23 @@ class ConfigActivity : Activity() {
         alphaLabel = findViewById(R.id.alphaLabel)
         alphaSeek = findViewById(R.id.alphaSeek)
 
-        // Los permisos viven en Ajustes del sistema: el interruptor abre la
-        // pantalla correspondiente y refleja el estado real al volver.
+        // Captura automática vive en Ajustes del sistema (no se puede apagar por código).
+        // El botón flotante sí tiene interruptor propio: no hace falta quitar permisos.
         autoSwitch.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             autoSwitch.isChecked = isCaptureServiceEnabled()
         }
         bubbleSwitch.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            bubbleSwitch.isChecked = Settings.canDrawOverlays(this)
+            if (!Settings.canDrawOverlays(this)) {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                )
+                bubbleSwitch.isChecked = false
+            } else {
+                val enabled = !prefs.getBoolean("bubble_enabled", true)
+                prefs.edit().putBoolean("bubble_enabled", enabled).apply()
+                bubbleSwitch.isChecked = enabled
+            }
         }
 
         sizeSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -82,7 +90,7 @@ class ConfigActivity : Activity() {
     override fun onResume() {
         super.onResume()
         autoSwitch.isChecked = isCaptureServiceEnabled()
-        bubbleSwitch.isChecked = Settings.canDrawOverlays(this)
+        bubbleSwitch.isChecked = Settings.canDrawOverlays(this) && prefs.getBoolean("bubble_enabled", true)
         val sizeDp = prefs.getInt("bubble_size_dp", 56)
         sizeSeek.progress = sizeDp - 32
         sizeLabel.text = "Tamaño del botón flotante: ${sizeDp}dp"

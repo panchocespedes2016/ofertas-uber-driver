@@ -68,6 +68,7 @@ class OfferCaptureService : AccessibilityService() {
     private val prefsListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == "bubble_size_dp" || key == "bubble_alpha_pct") applyBubbleAppearance()
+            if (key == "bubble_enabled") setBubbleVisible(true)
         }
 
     private val manualReceiver = object : BroadcastReceiver() {
@@ -83,6 +84,8 @@ class OfferCaptureService : AccessibilityService() {
         database = EvidenceDatabase(this)
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+        setBubbleVisible(true)
         val filter = IntentFilter(ACTION_MANUAL)
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             registerReceiver(manualReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -143,7 +146,6 @@ class OfferCaptureService : AccessibilityService() {
         }
         bubble = view
         bubbleParams = params
-        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
     private fun applyBubbleAppearance() {
@@ -157,13 +159,15 @@ class OfferCaptureService : AccessibilityService() {
     }
 
     private fun setBubbleVisible(visible: Boolean) {
-        if (visible == bubbleVisible) return
-        if (visible && !Settings.canDrawOverlays(this)) return
+        // El usuario puede apagar el botón desde Config sin quitar permisos
+        val effective = visible && prefs.getBoolean("bubble_enabled", true)
+        if (effective == bubbleVisible) return
+        if (effective && !Settings.canDrawOverlays(this)) return
         ensureBubble()
         val view = bubble ?: return
-        bubbleVisible = visible
+        bubbleVisible = effective
         runCatching {
-            if (visible) {
+            if (effective) {
                 applyBubbleAppearance()
                 windowManager.addView(view, bubbleParams)
             } else {
