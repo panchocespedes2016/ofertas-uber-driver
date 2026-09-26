@@ -242,7 +242,8 @@ class OfferCaptureService : AccessibilityService() {
         val x = (ZONE_X_MIN + Math.random() * (ZONE_X_MAX - ZONE_X_MIN)).toFloat() * w
         val y = (ZONE_Y_MIN + Math.random() * (ZONE_Y_MAX - ZONE_Y_MIN)).toFloat() * h
         val path = Path().apply { moveTo(x, y) }
-        val durationMs = (60 + Math.random() * 80).toLong()
+        // Duración fija del toque: la variación natural ya la pone tu reacción
+        val durationMs = 100L
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
             .build()
