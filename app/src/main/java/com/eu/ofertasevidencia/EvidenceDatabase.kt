@@ -79,4 +79,10 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
         writableDatabase.delete("offers", "id=?", arrayOf(id.toString()))
         return path
     }
+
+    /** Actualiza la ruta de la captura de un registro (migración a la galería). */
+    fun updateScreenshotPath(id: Long, newPath: String) {
+        val values = ContentValues().apply { put("screenshot_path", newPath) }
+        writableDatabase.update("offers", values, "id=?", arrayOf(id.toString()))
+    }
 }

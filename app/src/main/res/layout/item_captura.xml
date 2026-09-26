@@ -39,7 +39,7 @@
         android:id="@+id/shareBtn"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_menu_share"
         android:contentDescription="Compartir captura" />
 
@@ -47,7 +47,7 @@
         android:id="@+id/deleteBtn"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_menu_delete"
         android:contentDescription="Borrar captura" />
 </LinearLayout>

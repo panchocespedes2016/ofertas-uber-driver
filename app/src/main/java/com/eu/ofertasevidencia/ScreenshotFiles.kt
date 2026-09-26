@@ -38,6 +38,27 @@ object ScreenshotFiles {
         return uri
     }
 
+    /** Mueve un PNG existente (ruta de archivo) a la galería. Devuelve el content:// URI o null. */
+    fun moveFileToGallery(context: Context, file: File, capturedAt: Long): Uri? {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "oferta_${capturedAt}.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, RELATIVE_DIR)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+        val ok = runCatching {
+            resolver.openOutputStream(uri)?.use { out ->
+                file.inputStream().use { it.copyTo(out) }
+            } != null
+        }.getOrDefault(false)
+        if (!ok) {
+            runCatching { resolver.delete(uri, null, null) }
+            return null
+        }
+        return uri
+    }
+
     fun exists(context: Context, path: String): Boolean {
         if (path.isBlank()) return false
         return if (path.startsWith("content://")) {

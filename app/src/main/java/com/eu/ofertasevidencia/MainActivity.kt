@@ -79,6 +79,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.capturesButton).setOnClickListener {
             startActivity(Intent(this, CapturesActivity::class.java))
         }
+        migrateOldScreenshots()
         findViewById<Button>(R.id.deleteButton).setOnClickListener { confirmDeleteAll() }
         offerList.setOnItemClickListener { _, _, position, _ -> showRecord(records[position]) }
 
@@ -197,6 +198,32 @@ class MainActivity : Activity() {
     }
 
     private fun csv(value: String): String = "\"${value.replace("\"", "\"\"")}\""
+
+    /**
+     * Migración única: mueve los PNG guardados en el almacenamiento privado
+     * (versiones anteriores) a la galería (Pictures/EvidenciaOfertas) y
+     * actualiza los registros. No toca los registros que ya están en la galería.
+     */
+    private fun migrateOldScreenshots() {
+        if (prefs.getBoolean("gallery_migrated", false)) return
+        var moved = 0
+        for (record in database.all()) {
+            val path = record.screenshotPath
+            if (path.isBlank() || path.startsWith("content://")) continue
+            val file = File(path)
+            if (!file.exists()) continue
+            val uri = ScreenshotFiles.moveFileToGallery(this, file, record.capturedAt) ?: continue
+            database.updateScreenshotPath(record.id, uri.toString())
+            file.delete()
+            moved++
+        }
+        // Limpia las carpetas viejas si quedaron vacías
+        runCatching { File(filesDir, "evidence").deleteRecursively() }
+        prefs.edit().putBoolean("gallery_migrated", true).apply()
+        if (moved > 0) {
+            Toast.makeText(this, "$moved capturas movidas a la galería", Toast.LENGTH_LONG).show()
+        }
+    }
 
     private fun confirmDeleteRecord(record: OfferRecord) {
         AlertDialog.Builder(this)
