@@ -92,6 +92,13 @@
         android:text="Ofertas registradas (toca una para compartir la captura)"
         android:textStyle="bold" />
 
+    <Button
+        android:id="@+id/capturesButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="📷 Capturas" />
+
     <ListView
         android:id="@+id/offerList"
         android:layout_width="match_parent"

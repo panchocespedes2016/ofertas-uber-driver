@@ -11,6 +11,11 @@
         android:theme="@style/AppTheme">
 
         <activity
+            android:name=".CapturesActivity"
+            android:exported="false"
+            android:label="Capturas" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

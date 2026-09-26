@@ -76,6 +76,9 @@ class MainActivity : Activity() {
         })
         findViewById<Button>(R.id.refreshButton).setOnClickListener { refresh() }
         findViewById<Button>(R.id.exportButton).setOnClickListener { exportCsv() }
+        findViewById<Button>(R.id.capturesButton).setOnClickListener {
+            startActivity(Intent(this, CapturesActivity::class.java))
+        }
         findViewById<Button>(R.id.deleteButton).setOnClickListener { confirmDeleteAll() }
         offerList.setOnItemClickListener { _, _, position, _ -> showRecord(records[position]) }
 
