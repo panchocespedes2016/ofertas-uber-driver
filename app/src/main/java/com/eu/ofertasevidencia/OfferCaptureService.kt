@@ -410,10 +410,9 @@ class OfferCaptureService : AccessibilityService() {
             return
         }
         val packageName = root.packageName?.toString() ?: ""
-        if (!isUberDriverPackage(packageName)) {
-            if (!automatic) {
-                Toast.makeText(this, "Abre Uber Driver y toca el botón", Toast.LENGTH_SHORT).show()
-            }
+        // La captura automática solo corre dentro de Uber Driver.
+        // El botón manual actúa siempre, esté en la app que esté.
+        if (automatic && !isUberDriverPackage(packageName)) {
             onDone(null)
             return
         }
