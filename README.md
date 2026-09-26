@@ -41,6 +41,17 @@ No solicita permiso de Internet: las evidencias permanecen en el dispositivo has
 
 La notificación **Captura de ofertas activa** incluye **Capturar ahora** para guardar manualmente el contenido visible de Uber Driver si la detección automática no reconoce una oferta.
 
+## Botón flotante
+
+Al abrir Uber Driver aparece un botón flotante (círculo) sobre la pantalla. Al tocarlo:
+
+1. Guarda la evidencia de la oferta visible (captura + datos + huellas).
+2. Toca automáticamente el botón **Match**/**Accept** de Uber en un punto aleatorio dentro de su zona habitual (medida en un Galaxy S22 Ultra: x 25%–90%, y 85%–91% de la pantalla).
+
+El botón se puede **arrastrar** a cualquier posición y en la app se ajustan su **tamaño** (32–96 dp) y **opacidad** (30–100%). Requiere el permiso **"Mostrar sobre otras apps"**, que se concede una vez con el botón **Permitir botón flotante sobre Uber** en la pantalla principal.
+
+Para verificar si la app logra leer el texto de las ofertas (o si haría falta OCR), abre un registro tocándolo en la lista: el detalle muestra el texto extraído. Si aparece vacío, el texto no está expuesto.
+
 ## Cómo funciona
 
 El servicio solo procesa ventanas cuyo nombre de paquete parece corresponder a Uber Driver. Busca texto típico de una oferta (por ejemplo, aceptar/rechazar, viaje, distancia e importe), evita duplicados recientes y usa la API de captura de pantalla del servicio de accesibilidad. Los archivos PNG se guardan en el almacenamiento privado de la aplicación.
