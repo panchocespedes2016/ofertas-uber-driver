@@ -74,6 +74,16 @@ class CapturesActivity : Activity() {
             loadThumbnail(record.screenshotPath, view.findViewById(R.id.thumb))
             view.findViewById<ImageButton>(R.id.shareBtn).setOnClickListener { shareCapture(record) }
             view.findViewById<ImageButton>(R.id.deleteBtn).setOnClickListener { confirmDelete(record) }
+            // Tocar la fila (o la miniatura) abre la captura en pantalla completa
+            val openDetail = {
+                CaptureDetailActivity.open(
+                    this@CapturesActivity,
+                    record.screenshotPath,
+                    dateFormat.format(Date(record.capturedAt))
+                )
+            }
+            view.setOnClickListener { openDetail() }
+            view.findViewById<ImageView>(R.id.thumb).setOnClickListener { openDetail() }
             return view
         }
     }

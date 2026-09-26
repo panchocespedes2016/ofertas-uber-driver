@@ -11,6 +11,11 @@
         android:theme="@style/AppTheme">
 
         <activity
+            android:name=".CaptureDetailActivity"
+            android:exported="false"
+            android:label="Captura" />
+
+        <activity
             android:name=".CapturesActivity"
             android:exported="false"
             android:label="Capturas" />
