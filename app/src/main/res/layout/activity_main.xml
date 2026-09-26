@@ -2,113 +2,49 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="20dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Evidencia de ofertas"
-        android:textColor="#0B2E1A"
-        android:textSize="26sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:textSize="16sp" />
-
-    <Button
-        android:id="@+id/openAccessibilityButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Activar captura automática" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Botón flotante (captura + acepta con un toque)"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/overlayButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Permitir botón flotante sobre Uber" />
-
-    <TextView
-        android:id="@+id/sizeLabel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Tamaño del botón flotante" />
-
-    <SeekBar
-        android:id="@+id/sizeSeek"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:max="64" />
-
-    <TextView
-        android:id="@+id/alphaLabel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Opacidad del botón flotante" />
-
-    <SeekBar
-        android:id="@+id/alphaSeek"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:max="70" />
+    android:background="@color/bg_cream"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/refreshButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Actualizar" />
-        <Button
-            android:id="@+id/exportButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Exportar CSV" />
-    </LinearLayout>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Ofertas registradas (toca una para compartir la captura)"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/capturesButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="📷 Capturas" />
-
-    <ListView
-        android:id="@+id/offerList"
-        android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:dividerHeight="8dp" />
+        android:orientation="vertical"
+        android:padding="20dp">
 
-    <Button
-        android:id="@+id/deleteButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Borrar todos los registros" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Evidencia de ofertas"
+            android:textColor="@color/ink"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/ink"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/openAccessibilityButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Activar captura automática" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="El servicio detecta las ofertas de Uber Driver y guarda la captura en tu galería, en la carpeta EvidenciaOfertas."
+            android:textColor="@color/ink_soft"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <include
+        android:id="@+id/bottomNav"
+        layout="@layout/bottom_nav" />
 </LinearLayout>

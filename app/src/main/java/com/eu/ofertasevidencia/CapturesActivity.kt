@@ -35,6 +35,7 @@ class CapturesActivity : Activity() {
         countText = findViewById(R.id.capturesCount)
         listView = findViewById(R.id.capturesList)
         listView.adapter = CaptureAdapter()
+        BottomNav.bind(this, BottomNav.CAPTURES)
     }
 
     override fun onResume() {

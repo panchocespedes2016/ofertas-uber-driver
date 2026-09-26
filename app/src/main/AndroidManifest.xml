@@ -16,6 +16,11 @@
             android:label="Capturas" />
 
         <activity
+            android:name=".ConfigActivity"
+            android:exported="false"
+            android:label="Configuración" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

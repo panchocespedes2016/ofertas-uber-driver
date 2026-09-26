@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_cream">#F6F1E7</color>
+    <color name="card_white">#FFFFFF</color>
+    <color name="ink">#0B2E1A</color>
+    <color name="ink_soft">#6B7A70</color>
+    <color name="accent">#145A32</color>
+    <color name="danger">#B3261E</color>
+</resources>
