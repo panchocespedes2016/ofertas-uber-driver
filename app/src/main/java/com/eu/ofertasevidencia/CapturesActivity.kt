@@ -3,7 +3,9 @@ package com.eu.ofertasevidencia
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -59,6 +61,14 @@ class CapturesActivity : Activity() {
                 ?: LayoutInflater.from(this@CapturesActivity).inflate(R.layout.item_captura, parent, false)
             val record = records[position]
             view.findViewById<TextView>(R.id.dateText).text = dateFormat.format(Date(record.capturedAt))
+            val badge = view.findViewById<TextView>(R.id.sourceBadge)
+            if (record.automatic) {
+                badge.text = "Automática"
+                badge.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#4A6FA5"))
+            } else {
+                badge.text = "Aceptada"
+                badge.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#2E7D32"))
+            }
             view.findViewById<TextView>(R.id.summaryText).text =
                 (if (record.screenshotPath.isBlank()) "Solo texto · " else "Contiene · ") + record.summary
             loadThumbnail(record.screenshotPath, view.findViewById(R.id.thumb))

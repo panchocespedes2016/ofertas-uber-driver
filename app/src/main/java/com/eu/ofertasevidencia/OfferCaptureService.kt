@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.os.Handler
@@ -24,6 +25,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import java.io.File
 import java.io.FileOutputStream
@@ -55,15 +58,22 @@ class OfferCaptureService : AccessibilityService() {
     private var captureInProgress = false
     private var lastForegroundPackage: String? = null
 
-    // Botón flotante
-    private var bubble: ImageView? = null
+    // Botón flotante: contenedor horizontal con el icono y (al aceptar) las métricas $/h y $/mi
+    private var bubbleLayout: LinearLayout? = null
+    private var bubbleIcon: ImageView? = null
+    private var bubbleMetrics: TextView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var bubbleVisible = false
+    private var bubbleExpanded = false
+    private var bubbleExpandedLeft = false
+    private var bubbleExpandedExtra = 0
+    private var pendingMetrics: Pair<Double, Double>? = null
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var touchStartX = 0
     private var touchStartY = 0
     private var touchMoved = false
+    private var touchSwallowed = false
 
     private val prefsListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -117,9 +127,10 @@ class OfferCaptureService : AccessibilityService() {
 
     override fun onDestroy() {
         pendingCheck?.let(handler::removeCallbacks)
+        handler.removeCallbacks(collapseBubbleRunnable)
         runCatching { unregisterReceiver(manualReceiver) }
         runCatching { prefs.unregisterOnSharedPreferenceChangeListener(prefsListener) }
-        if (bubbleVisible) runCatching { windowManager.removeView(bubble) }
+        if (bubbleVisible) runCatching { windowManager.removeView(bubbleLayout) }
         bubbleVisible = false
         (getSystemService(NotificationManager::class.java)).cancel(NOTIFICATION_ID)
         super.onDestroy()
@@ -128,8 +139,8 @@ class OfferCaptureService : AccessibilityService() {
     // ---------- Botón flotante ----------
 
     private fun ensureBubble() {
-        if (bubble != null) return
-        val metrics = windowManager.currentWindowMetrics.bounds
+        if (bubbleLayout != null) return
+        val screen = windowManager.currentWindowMetrics.bounds
         val sizePx = dpToPx(prefs.getInt("bubble_size_dp", 56))
         val params = WindowManager.LayoutParams(
             sizePx, sizePx,
@@ -138,27 +149,49 @@ class OfferCaptureService : AccessibilityService() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = (prefs.getFloat("bubble_x_frac", 0.85f) * metrics.width()).roundToInt()
-            y = (prefs.getFloat("bubble_y_frac", 0.70f) * metrics.height()).roundToInt()
+            x = (prefs.getFloat("bubble_x_frac", 0.85f) * screen.width()).roundToInt()
+            y = (prefs.getFloat("bubble_y_frac", 0.70f) * screen.height()).roundToInt()
         }
-        val view = ImageView(this).apply {
+        val icon = ImageView(this).apply {
             setImageResource(R.drawable.bubble)
+            layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
+        }
+        val metricsView = TextView(this).apply {
+            setBackgroundResource(R.drawable.bubble_pill)
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setPadding(dpToPx(12), 0, dpToPx(12), 0)
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, sizePx
+            )
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             contentDescription = "Capturar oferta y aceptar"
             alpha = prefs.getInt("bubble_alpha_pct", 85) / 100f
+            addView(icon)
             setOnTouchListener { v, e -> onBubbleTouch(v, e, params) }
         }
-        bubble = view
+        bubbleLayout = layout
+        bubbleIcon = icon
+        bubbleMetrics = metricsView
         bubbleParams = params
     }
 
     private fun applyBubbleAppearance() {
-        val view = bubble ?: return
+        val layout = bubbleLayout ?: return
         val params = bubbleParams ?: return
+        // Si el tamaño o la opacidad cambian, el botón vuelve a su forma compacta
+        collapseBubble()
         val sizePx = dpToPx(prefs.getInt("bubble_size_dp", 56))
         params.width = sizePx
         params.height = sizePx
-        view.alpha = prefs.getInt("bubble_alpha_pct", 85) / 100f
-        if (bubbleVisible) runCatching { windowManager.updateViewLayout(view, params) }
+        layout.alpha = prefs.getInt("bubble_alpha_pct", 85) / 100f
+        bubbleIcon?.layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
+        if (bubbleVisible) runCatching { windowManager.updateViewLayout(layout, params) }
     }
 
     private fun setBubbleVisible(visible: Boolean) {
@@ -167,14 +200,15 @@ class OfferCaptureService : AccessibilityService() {
         if (effective == bubbleVisible) return
         if (effective && !Settings.canDrawOverlays(this)) return
         ensureBubble()
-        val view = bubble ?: return
+        val layout = bubbleLayout ?: return
+        collapseBubble()
         bubbleVisible = effective
         runCatching {
             if (effective) {
                 applyBubbleAppearance()
-                windowManager.addView(view, bubbleParams)
+                windowManager.addView(layout, bubbleParams)
             } else {
-                windowManager.removeView(view)
+                windowManager.removeView(layout)
             }
         }
     }
@@ -182,6 +216,12 @@ class OfferCaptureService : AccessibilityService() {
     private fun onBubbleTouch(view: View, event: MotionEvent, params: WindowManager.LayoutParams): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // Si está alargado mostrando métricas, este toque solo lo colapsa
+                if (bubbleExpanded) {
+                    collapseBubble()
+                    touchSwallowed = true
+                    return true
+                }
                 touchDownX = event.rawX
                 touchDownY = event.rawY
                 touchStartX = params.x
@@ -201,6 +241,10 @@ class OfferCaptureService : AccessibilityService() {
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                if (touchSwallowed) {
+                    touchSwallowed = false
+                    return true
+                }
                 if (touchMoved) {
                     val metrics = windowManager.currentWindowMetrics.bounds
                     prefs.edit()
@@ -217,6 +261,67 @@ class OfferCaptureService : AccessibilityService() {
         return false
     }
 
+    private val collapseBubbleRunnable = Runnable { collapseBubble() }
+
+    /**
+     * Alarga el botón hacia el lado con más espacio y muestra $/h y $/mi.
+     * Se colapsa solo a los 6 segundos o al tocarlo.
+     */
+    private fun showBubbleMetrics(perHour: Double, perMile: Double) {
+        val layout = bubbleLayout ?: return
+        val params = bubbleParams ?: return
+        val metricsView = bubbleMetrics ?: return
+        val icon = bubbleIcon ?: return
+        if (!bubbleVisible) return
+        collapseBubble()
+        val sizePx = dpToPx(prefs.getInt("bubble_size_dp", 56))
+        metricsView.text = String.format(Locale.US, "$/h %.2f   $/mi %.2f", perHour, perMile)
+        metricsView.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val pillWidth = metricsView.measuredWidth + sizePx + dpToPx(8)
+        val screenW = windowManager.currentWindowMetrics.bounds.width()
+        // Crece hacia el lado con más espacio para no salirse de la pantalla
+        val expandLeft = params.x + sizePx / 2 > screenW / 2
+        layout.removeAllViews()
+        if (expandLeft) {
+            layout.addView(metricsView)
+            layout.addView(icon)
+            params.x = (params.x - (pillWidth - sizePx)).coerceAtLeast(0)
+        } else {
+            layout.addView(icon)
+            layout.addView(metricsView)
+        }
+        metricsView.visibility = View.VISIBLE
+        params.width = pillWidth
+        params.height = sizePx
+        bubbleExpanded = true
+        bubbleExpandedLeft = expandLeft
+        bubbleExpandedExtra = pillWidth - sizePx
+        runCatching { windowManager.updateViewLayout(layout, params) }
+        handler.removeCallbacks(collapseBubbleRunnable)
+        handler.postDelayed(collapseBubbleRunnable, 6000)
+    }
+
+    private fun collapseBubble() {
+        if (!bubbleExpanded) return
+        bubbleExpanded = false
+        handler.removeCallbacks(collapseBubbleRunnable)
+        val layout = bubbleLayout ?: return
+        val params = bubbleParams ?: return
+        val icon = bubbleIcon ?: return
+        val metricsView = bubbleMetrics ?: return
+        val sizePx = dpToPx(prefs.getInt("bubble_size_dp", 56))
+        metricsView.visibility = View.GONE
+        layout.removeAllViews()
+        layout.addView(icon)
+        if (bubbleExpandedLeft) params.x += bubbleExpandedExtra
+        params.width = sizePx
+        params.height = sizePx
+        if (bubbleVisible) runCatching { windowManager.updateViewLayout(layout, params) }
+    }
+
     private fun onBubbleTap() {
         // Ocultar el flotante para que no salga en la evidencia
         setBubbleVisible(false)
@@ -224,14 +329,29 @@ class OfferCaptureService : AccessibilityService() {
             inspectCurrentWindow(automatic = false) { analysis ->
                 if (analysis?.isOffer == true) {
                     tapAcceptRandom()
+                    pendingMetrics = offerMetrics(analysis)
                 } else if (analysis != null) {
                     Toast.makeText(this, "Captura guardada", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Abre una oferta de Uber Driver y toca el botón", Toast.LENGTH_SHORT).show()
                 }
-                handler.postDelayed({ setBubbleVisible(true) }, 400)
+                handler.postDelayed({
+                    setBubbleVisible(true)
+                    pendingMetrics?.let { (perHour, perMile) ->
+                        showBubbleMetrics(perHour, perMile)
+                    }
+                    pendingMetrics = null
+                }, 400)
             }
         }, 150)
+    }
+
+    /** $/h y $/mi a partir del análisis, o null si faltan datos. */
+    private fun offerMetrics(analysis: OfferAnalyzer.Result): Pair<Double, Double>? {
+        val price = analysis.price ?: return null
+        val minutes = analysis.totalMinutes?.takeIf { it > 0 } ?: return null
+        val miles = analysis.totalMiles?.takeIf { it > 0 } ?: return null
+        return Pair(price / (minutes / 60.0), price / miles)
     }
 
     /** Toca un punto aleatorio dentro de la zona común del botón Match/Accept. */
