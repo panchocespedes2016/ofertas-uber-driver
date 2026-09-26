@@ -54,7 +54,15 @@ Para verificar si la app logra leer el texto de las ofertas (o si haría falta O
 
 ## Cómo funciona
 
-El servicio solo procesa ventanas cuyo nombre de paquete parece corresponder a Uber Driver. Busca texto típico de una oferta (por ejemplo, aceptar/rechazar, viaje, distancia e importe), evita duplicados recientes y usa la API de captura de pantalla del servicio de accesibilidad. Los PNG se guardan en la galería del teléfono, en la carpeta **Pictures/EvidenciaOfertas** (visible en Galería y en el explorador de archivos). Desde el detalle de cada registro se puede **compartir** su captura o **borrar** ese registro individual; el botón **📷 Capturas** abre una pantalla con todas las evidencias en lista (miniatura, fecha, resumen y botones de compartir/borrar por fila, como referencia visual rápida). El botón **Borrar todos los registros** sigue disponible para limpiar todo.
+El servicio solo procesa ventanas cuyo nombre de paquete parece corresponder a Uber Driver. Busca texto típico de una oferta (por ejemplo, aceptar/rechazar, viaje, distancia e importe), evita duplicados recientes y usa la API de captura de pantalla del servicio de accesibilidad. Los PNG se guardan en la galería del teléfono, en la carpeta **Pictures/EvidenciaOfertas** (visible en Galería y en el explorador de archivos).
+
+La app tiene tres pantallas con barra inferior:
+
+- **Inicio**: estado del servicio y botón para activar la captura automática.
+- **📷 Capturas**: lista de evidencias con miniatura, fecha y resumen; cada fila permite **compartir** o **borrar** esa captura.
+- **⚙️ Config**: tarjetas de *Monitoreo* (interruptores de captura automática y botón flotante), *Botón flotante* (tamaño 32–96 dp y opacidad 30–100%) y *Datos* (exportar CSV, borrar todos los registros).
+
+Al abrir una versión nueva, los PNG guardados antes en el almacenamiento privado se **mueven automáticamente** a la galería y se actualizan los registros.
 
 ## Limitaciones importantes
 
