@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -23,7 +24,7 @@ class CaptureDetailActivity : Activity() {
 
         val imageView = findViewById<ImageView>(R.id.fullImage)
         // Tocar en cualquier parte cierra la vista ampliada
-        findViewById(android.R.id.content).setOnClickListener { finish() }
+        findViewById<View>(android.R.id.content).setOnClickListener { finish() }
 
         if (path.isBlank() || !ScreenshotFiles.exists(this, path)) {
             Toast.makeText(this, "Esta captura no tiene imagen", Toast.LENGTH_SHORT).show()
