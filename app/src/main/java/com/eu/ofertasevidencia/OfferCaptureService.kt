@@ -344,14 +344,24 @@ class OfferCaptureService : AccessibilityService() {
         automatic: Boolean
     ) {
         runCatching {
-            val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(capturedAt))
-            val dir = File(filesDir, "evidence/$day").apply { mkdirs() }
-            val file = File(dir, "oferta_${capturedAt}.png")
-            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            val imageHash = OfferAnalyzer.sha256(file.readBytes())
+            // Carpeta visible en la galería; si falla, reserva en almacenamiento privado.
+            val galleryUri = ScreenshotFiles.saveToGallery(this, bitmap, capturedAt)
+            val path: String
+            val imageHash: String
+            if (galleryUri != null) {
+                path = galleryUri.toString()
+                imageHash = OfferAnalyzer.sha256(ScreenshotFiles.readBytes(this, path) ?: ByteArray(0))
+            } else {
+                val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(capturedAt))
+                val dir = File(filesDir, "evidence/$day").apply { mkdirs() }
+                val file = File(dir, "oferta_${capturedAt}.png")
+                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                path = file.absolutePath
+                imageHash = OfferAnalyzer.sha256(file.readBytes())
+            }
             database.insert(
                 OfferRecord(0, capturedAt, packageName, analysis.summary, analysis.normalized,
-                    file.absolutePath, imageHash, analysis.hash, automatic)
+                    path, imageHash, analysis.hash, automatic)
             )
         }.onFailure {
             saveTextOnly(capturedAt, packageName, analysis, automatic)

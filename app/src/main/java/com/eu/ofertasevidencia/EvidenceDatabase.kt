@@ -68,4 +68,15 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
         writableDatabase.delete("offers", null, null)
         return paths
     }
+
+    /** Borra un registro por id. Devuelve la ruta de su captura (o null). */
+    fun deleteById(id: Long): String? {
+        var path: String? = null
+        readableDatabase.rawQuery(
+            "SELECT screenshot_path FROM offers WHERE id=?",
+            arrayOf(id.toString())
+        ).use { if (it.moveToFirst()) path = it.getString(0) }
+        writableDatabase.delete("offers", "id=?", arrayOf(id.toString()))
+        return path
+    }
 }

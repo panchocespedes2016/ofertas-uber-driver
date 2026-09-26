@@ -146,16 +146,15 @@ class MainActivity : Activity() {
             .setTitle("Oferta registrada")
             .setMessage(details)
             .setNegativeButton("Cerrar", null)
-        if (record.screenshotPath.isNotBlank() && File(record.screenshotPath).exists()) {
+            .setNeutralButton("Borrar") { _, _ -> confirmDeleteRecord(record) }
+        if (record.screenshotPath.isNotBlank() && ScreenshotFiles.exists(this, record.screenshotPath)) {
             builder.setPositiveButton("Compartir captura") { _, _ -> shareScreenshot(record) }
         }
         builder.show()
     }
 
     private fun shareScreenshot(record: OfferRecord) {
-        val file = File(record.screenshotPath)
-        if (!file.exists()) return
-        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+        val uri: Uri = ScreenshotFiles.shareableUri(this, record.screenshotPath) ?: return
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -196,13 +195,27 @@ class MainActivity : Activity() {
 
     private fun csv(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 
+    private fun confirmDeleteRecord(record: OfferRecord) {
+        AlertDialog.Builder(this)
+            .setTitle("¿Borrar esta captura?")
+            .setMessage("Se eliminará el registro del ${dateFormat.format(Date(record.capturedAt))} y su imagen de la galería. Esta acción no se puede deshacer.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Borrar") { _, _ ->
+                val path = database.deleteById(record.id) ?: record.screenshotPath
+                ScreenshotFiles.delete(this, path)
+                refresh()
+                Toast.makeText(this, "Captura eliminada", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
     private fun confirmDeleteAll() {
         AlertDialog.Builder(this)
             .setTitle("¿Borrar toda la evidencia?")
             .setMessage("Se eliminarán los registros y las capturas del dispositivo. Esta acción no se puede deshacer.")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Borrar") { _, _ ->
-                database.deleteAll().forEach { path -> if (path.isNotBlank()) File(path).delete() }
+                database.deleteAll().forEach { path -> ScreenshotFiles.delete(this, path) }
                 refresh()
             }
             .show()
