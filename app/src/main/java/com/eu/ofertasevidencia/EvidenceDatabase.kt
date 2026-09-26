@@ -85,4 +85,14 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
         val values = ContentValues().apply { put("screenshot_path", newPath) }
         writableDatabase.update("offers", values, "id=?", arrayOf(id.toString()))
     }
+
+    /** Completa un registro con el texto extraído por OCR (resumen, texto y hash). */
+    fun updateOcrText(id: Long, summary: String, rawText: String, textHash: String) {
+        val values = ContentValues().apply {
+            put("summary", summary)
+            put("raw_text", rawText)
+            put("text_sha256", textHash)
+        }
+        writableDatabase.update("offers", values, "id=?", arrayOf(id.toString()))
+    }
 }

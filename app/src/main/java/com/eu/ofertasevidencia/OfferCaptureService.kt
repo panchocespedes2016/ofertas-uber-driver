@@ -28,6 +28,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.LatinTextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -67,7 +70,17 @@ class OfferCaptureService : AccessibilityService() {
     private var bubbleExpanded = false
     private var bubbleExpandedLeft = false
     private var bubbleExpandedExtra = 0
-    private var pendingMetrics: Pair<Double, Double>? = null
+
+    // OCR en el teléfono: lee la oferta de la imagen porque Uber no expone texto
+    private val ocrClient by lazy { TextRecognition.getClient(LatinTextRecognizerOptions.DEFAULT) }
+
+    private fun recognizeText(bitmap: Bitmap, onResult: (String) -> Unit) {
+        runCatching {
+            ocrClient.process(InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { visionText -> onResult(visionText.text) }
+                .addOnFailureListener { onResult("") }
+        }.onFailure { onResult("") }
+    }
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var touchStartX = 0
@@ -133,6 +146,7 @@ class OfferCaptureService : AccessibilityService() {
         if (bubbleVisible) runCatching { windowManager.removeView(bubbleLayout) }
         bubbleVisible = false
         (getSystemService(NotificationManager::class.java)).cancel(NOTIFICATION_ID)
+        runCatching { ocrClient.close() }
         super.onDestroy()
     }
 
@@ -323,25 +337,14 @@ class OfferCaptureService : AccessibilityService() {
     }
 
     private fun onBubbleTap() {
-        // Ocultar el flotante para que no salga en la evidencia
+        // Ocultar el flotante para que no salga en la evidencia.
+        // El toque en la zona de Aceptar se dispara siempre dentro de inspect,
+        // sin verificar si es oferta: Uber pinta todo como imagen.
         setBubbleVisible(false)
         handler.postDelayed({
-            inspectCurrentWindow(automatic = false) { analysis ->
-                if (analysis?.isOffer == true) {
-                    tapAcceptRandom()
-                    pendingMetrics = offerMetrics(analysis)
-                } else if (analysis != null) {
-                    Toast.makeText(this, "Captura guardada", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Abre una oferta de Uber Driver y toca el botón", Toast.LENGTH_SHORT).show()
-                }
-                handler.postDelayed({
-                    setBubbleVisible(true)
-                    pendingMetrics?.let { (perHour, perMile) ->
-                        showBubbleMetrics(perHour, perMile)
-                    }
-                    pendingMetrics = null
-                }, 400)
+            inspectCurrentWindow(automatic = false) {
+                // El botón vuelve 400 ms después de que el toque ya se disparó
+                handler.postDelayed({ setBubbleVisible(true) }, 400)
             }
         }, 150)
     }
@@ -387,6 +390,12 @@ class OfferCaptureService : AccessibilityService() {
 
     // ---------- Detección y captura ----------
 
+    /**
+     * Flujo con OCR (Uber pinta la oferta como imagen, no expone texto):
+     * - Automática: captura + OCR; solo guarda si el texto reconocido parece oferta.
+     * - Manual: SIEMPRE guarda la captura y SIEMPRE toca la zona de Aceptar,
+     *   sin verificar si es oferta. El OCR corre en paralelo para las métricas.
+     */
     private fun inspectCurrentWindow(
         automatic: Boolean,
         onDone: (OfferAnalyzer.Result?) -> Unit = {}
@@ -402,21 +411,10 @@ class OfferCaptureService : AccessibilityService() {
         }
         val packageName = root.packageName?.toString() ?: ""
         if (!isUberDriverPackage(packageName)) {
+            if (!automatic) {
+                Toast.makeText(this, "Abre Uber Driver y toca el botón", Toast.LENGTH_SHORT).show()
+            }
             onDone(null)
-            return
-        }
-
-        val analysis = OfferAnalyzer.analyze(readVisibleText(root))
-        if (automatic && !analysis.isOffer) {
-            onDone(null)
-            return
-        }
-        if (analysis.normalized.isBlank()) {
-            onDone(null)
-            return
-        }
-        if (database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)) {
-            onDone(analysis)
             return
         }
 
@@ -433,46 +431,93 @@ class OfferCaptureService : AccessibilityService() {
                         buffer.close()
                     }
                     if (bitmap == null) {
-                        saveTextOnly(capturedAt, packageName, analysis, automatic)
-                    } else {
-                        saveEvidence(bitmap, capturedAt, packageName, analysis, automatic)
-                        bitmap.recycle()
+                        captureInProgress = false
+                        if (!automatic) {
+                            tapAcceptRandom()
+                            Toast.makeText(this, "Oferta aceptada", Toast.LENGTH_SHORT).show()
+                        }
+                        onDone(null)
+                        return
                     }
-                    captureInProgress = false
-                    onDone(analysis)
+                    if (automatic) {
+                        recognizeText(bitmap) { ocrText ->
+                            try {
+                                val analysis = OfferAnalyzer.analyze(listOf(ocrText))
+                                if (!analysis.isOffer || analysis.normalized.isBlank()) {
+                                    onDone(null)
+                                    return@recognizeText
+                                }
+                                if (database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)) {
+                                    onDone(analysis)
+                                    return@recognizeText
+                                }
+                                saveEvidence(bitmap, capturedAt, packageName, analysis, true)
+                                onDone(analysis)
+                            } finally {
+                                bitmap.recycle()
+                                captureInProgress = false
+                            }
+                        }
+                    } else {
+                        // Manual: guardar ya, tocar ya; el OCR enriquece el registro en paralelo
+                        val placeholder = OfferAnalyzer.Result(
+                            isOffer = false, normalized = "", summary = "",
+                            hash = OfferAnalyzer.sha256("manual-$capturedAt".toByteArray())
+                        )
+                        val id = saveEvidence(bitmap, capturedAt, packageName, placeholder, false)
+                        captureInProgress = false
+                        tapAcceptRandom()
+                        Toast.makeText(this, "Oferta aceptada", Toast.LENGTH_SHORT).show()
+                        onDone(placeholder)
+                        if (id == -1L) {
+                            bitmap.recycle()
+                        } else {
+                            recognizeText(bitmap) { ocrText ->
+                                try {
+                                    if (ocrText.isNotBlank()) {
+                                        val analysis = OfferAnalyzer.analyze(listOf(ocrText))
+                                        if (database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)) {
+                                            // La misma oferta ya se guardó hace segundos: quitar el duplicado
+                                            database.deleteById(id)?.let { path ->
+                                                ScreenshotFiles.delete(this, path)
+                                            }
+                                        } else {
+                                            database.updateOcrText(id, analysis.summary, ocrText, analysis.hash)
+                                        }
+                                        offerMetrics(analysis)?.let { (perHour, perMile) ->
+                                            handler.post { showBubbleMetrics(perHour, perMile) }
+                                            handler.postDelayed({ showBubbleMetrics(perHour, perMile) }, 1500)
+                                        }
+                                    }
+                                } finally {
+                                    bitmap.recycle()
+                                }
+                            }
+                        }
+                    }
                 }
 
                 override fun onFailure(errorCode: Int) {
-                    saveTextOnly(capturedAt, packageName, analysis, automatic)
                     captureInProgress = false
-                    onDone(analysis)
+                    if (!automatic) {
+                        tapAcceptRandom()
+                        Toast.makeText(this, "Oferta aceptada", Toast.LENGTH_SHORT).show()
+                    }
+                    onDone(null)
                 }
             }
         )
     }
 
-    private fun readVisibleText(root: AccessibilityNodeInfo): List<String> {
-        val values = linkedSetOf<String>()
-        val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(root)
-        var visited = 0
-        while (queue.isNotEmpty() && visited++ < 700) {
-            val node = queue.removeFirst()
-            node.text?.toString()?.takeIf { it.isNotBlank() }?.let(values::add)
-            node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(values::add)
-            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::add)
-        }
-        return values.toList()
-    }
-
+    /** Guarda la captura y devuelve el id del registro, o -1 si falló. */
     private fun saveEvidence(
         bitmap: Bitmap,
         capturedAt: Long,
         packageName: String,
         analysis: OfferAnalyzer.Result,
         automatic: Boolean
-    ) {
-        runCatching {
+    ): Long {
+        return runCatching {
             // Carpeta visible en la galería; si falla, reserva en almacenamiento privado.
             val galleryUri = ScreenshotFiles.saveToGallery(this, bitmap, capturedAt)
             val path: String
@@ -492,23 +537,7 @@ class OfferCaptureService : AccessibilityService() {
                 OfferRecord(0, capturedAt, packageName, analysis.summary, analysis.normalized,
                     path, imageHash, analysis.hash, automatic)
             )
-        }.onFailure {
-            saveTextOnly(capturedAt, packageName, analysis, automatic)
-        }
-    }
-
-    private fun saveTextOnly(
-        capturedAt: Long,
-        packageName: String,
-        analysis: OfferAnalyzer.Result,
-        automatic: Boolean
-    ) {
-        runCatching {
-            database.insert(
-                OfferRecord(0, capturedAt, packageName, analysis.summary, analysis.normalized,
-                    "", "", analysis.hash, automatic)
-            )
-        }
+        }.getOrElse { -1L }
     }
 
     private fun isUberDriverPackage(name: String): Boolean {

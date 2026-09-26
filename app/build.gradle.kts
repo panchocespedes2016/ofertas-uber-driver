@@ -30,4 +30,6 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
+    // OCR en el teléfono (modelo incluido, sin internet): lee la oferta aunque Uber la pinte como imagen
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 }
