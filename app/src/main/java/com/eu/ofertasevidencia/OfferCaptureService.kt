@@ -30,7 +30,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.LatinTextRecognizerOptions
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -72,7 +72,7 @@ class OfferCaptureService : AccessibilityService() {
     private var bubbleExpandedExtra = 0
 
     // OCR en el teléfono: lee la oferta de la imagen porque Uber no expone texto
-    private val ocrClient by lazy { TextRecognition.getClient(LatinTextRecognizerOptions.DEFAULT) }
+    private val ocrClient by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT) }
 
     private fun recognizeText(bitmap: Bitmap, onResult: (String) -> Unit) {
         runCatching {
@@ -434,7 +434,7 @@ class OfferCaptureService : AccessibilityService() {
                         captureInProgress = false
                         if (!automatic) {
                             tapAcceptRandom()
-                            Toast.makeText(this, "Oferta aceptada", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@OfferCaptureService, "Oferta aceptada", Toast.LENGTH_SHORT).show()
                         }
                         onDone(null)
                         return
@@ -467,7 +467,7 @@ class OfferCaptureService : AccessibilityService() {
                         val id = saveEvidence(bitmap, capturedAt, packageName, placeholder, false)
                         captureInProgress = false
                         tapAcceptRandom()
-                        Toast.makeText(this, "Oferta aceptada", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@OfferCaptureService, "Oferta aceptada", Toast.LENGTH_SHORT).show()
                         onDone(placeholder)
                         if (id == -1L) {
                             bitmap.recycle()
@@ -479,7 +479,7 @@ class OfferCaptureService : AccessibilityService() {
                                         if (database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)) {
                                             // La misma oferta ya se guardó hace segundos: quitar el duplicado
                                             database.deleteById(id)?.let { path ->
-                                                ScreenshotFiles.delete(this, path)
+                                                ScreenshotFiles.delete(this@OfferCaptureService, path)
                                             }
                                         } else {
                                             database.updateOcrText(id, analysis.summary, ocrText, analysis.hash)
@@ -501,7 +501,7 @@ class OfferCaptureService : AccessibilityService() {
                     captureInProgress = false
                     if (!automatic) {
                         tapAcceptRandom()
-                        Toast.makeText(this, "Oferta aceptada", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@OfferCaptureService, "Oferta aceptada", Toast.LENGTH_SHORT).show()
                     }
                     onDone(null)
                 }
