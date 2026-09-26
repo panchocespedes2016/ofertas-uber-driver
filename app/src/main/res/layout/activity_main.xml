@@ -27,6 +27,46 @@
         android:layout_marginTop="12dp"
         android:text="Activar captura automática" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Botón flotante (captura + acepta con un toque)"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/overlayButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Permitir botón flotante sobre Uber" />
+
+    <TextView
+        android:id="@+id/sizeLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Tamaño del botón flotante" />
+
+    <SeekBar
+        android:id="@+id/sizeSeek"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="64" />
+
+    <TextView
+        android:id="@+id/alphaLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Opacidad del botón flotante" />
+
+    <SeekBar
+        android:id="@+id/alphaSeek"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="70" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

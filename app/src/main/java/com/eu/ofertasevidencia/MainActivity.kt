@@ -16,6 +16,8 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.TextView
 import android.widget.Toast
+import android.content.SharedPreferences
+import android.widget.SeekBar
 import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
@@ -24,7 +26,13 @@ import java.util.Locale
 
 class MainActivity : Activity() {
     private lateinit var database: EvidenceDatabase
+    private lateinit var prefs: SharedPreferences
     private lateinit var statusText: TextView
+    private lateinit var overlayButton: Button
+    private lateinit var sizeLabel: TextView
+    private lateinit var sizeSeek: SeekBar
+    private lateinit var alphaLabel: TextView
+    private lateinit var alphaSeek: SeekBar
     private lateinit var offerList: ListView
     private var records: List<OfferRecord> = emptyList()
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
@@ -33,12 +41,39 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         database = EvidenceDatabase(this)
+        prefs = getSharedPreferences(OfferCaptureService.PREFS, MODE_PRIVATE)
         statusText = findViewById(R.id.statusText)
+        overlayButton = findViewById(R.id.overlayButton)
+        sizeLabel = findViewById(R.id.sizeLabel)
+        sizeSeek = findViewById(R.id.sizeSeek)
+        alphaLabel = findViewById(R.id.alphaLabel)
+        alphaSeek = findViewById(R.id.alphaSeek)
         offerList = findViewById(R.id.offerList)
 
         findViewById<Button>(R.id.openAccessibilityButton).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        overlayButton.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        }
+        sizeSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val dp = 32 + progress
+                prefs.edit().putInt("bubble_size_dp", dp).apply()
+                sizeLabel.text = "Tamaño del botón flotante: ${dp}dp"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
+        alphaSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val pct = 30 + progress
+                prefs.edit().putInt("bubble_alpha_pct", pct).apply()
+                alphaLabel.text = "Opacidad del botón flotante: ${pct}%"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
         findViewById<Button>(R.id.refreshButton).setOnClickListener { refresh() }
         findViewById<Button>(R.id.exportButton).setOnClickListener { exportCsv() }
         findViewById<Button>(R.id.deleteButton).setOnClickListener { confirmDeleteAll() }
@@ -73,6 +108,21 @@ class MainActivity : Activity() {
             this, rows, android.R.layout.simple_list_item_2,
             arrayOf("line1", "line2"), intArrayOf(android.R.id.text1, android.R.id.text2)
         )
+        refreshBubbleSettings()
+    }
+
+    private fun refreshBubbleSettings() {
+        overlayButton.text = if (Settings.canDrawOverlays(this)) {
+            "✓ Botón flotante permitido"
+        } else {
+            "Permitir botón flotante sobre Uber"
+        }
+        val sizeDp = prefs.getInt("bubble_size_dp", 56)
+        sizeSeek.progress = sizeDp - 32
+        sizeLabel.text = "Tamaño del botón flotante: ${sizeDp}dp"
+        val alphaPct = prefs.getInt("bubble_alpha_pct", 85)
+        alphaSeek.progress = alphaPct - 30
+        alphaLabel.text = "Opacidad del botón flotante: ${alphaPct}%"
     }
 
     private fun isCaptureServiceEnabled(): Boolean {
