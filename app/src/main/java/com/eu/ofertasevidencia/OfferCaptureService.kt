@@ -36,6 +36,7 @@ import kotlin.math.roundToInt
 class OfferCaptureService : AccessibilityService() {
     companion object {
         const val ACTION_MANUAL = "com.eu.ofertasevidencia.CAPTURE_NOW"
+        const val ACTION_DISABLE_SELF = "com.eu.ofertasevidencia.DISABLE_SELF"
         private const val CHANNEL_ID = "capture_status"
         private const val NOTIFICATION_ID = 1107
         const val PREFS = "evidencia_prefs"
@@ -75,6 +76,8 @@ class OfferCaptureService : AccessibilityService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == ACTION_MANUAL) {
                 handler.postDelayed({ inspectCurrentWindow(automatic = false) }, 700)
+            } else if (intent?.action == ACTION_DISABLE_SELF) {
+                disableSelf()
             }
         }
     }
@@ -86,7 +89,7 @@ class OfferCaptureService : AccessibilityService() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         setBubbleVisible(true)
-        val filter = IntentFilter(ACTION_MANUAL)
+        val filter = IntentFilter(ACTION_MANUAL).apply { addAction(ACTION_DISABLE_SELF) }
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             registerReceiver(manualReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {

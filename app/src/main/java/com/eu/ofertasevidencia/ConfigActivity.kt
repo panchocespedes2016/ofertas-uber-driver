@@ -43,11 +43,16 @@ class ConfigActivity : Activity() {
         alphaLabel = findViewById(R.id.alphaLabel)
         alphaSeek = findViewById(R.id.alphaSeek)
 
-        // Captura automática vive en Ajustes del sistema (no se puede apagar por código).
+        // Apagar la captura automática se hace por código (el servicio se
+        // desactiva solo); encenderla sí exige los Ajustes del sistema.
         // El botón flotante sí tiene interruptor propio: no hace falta quitar permisos.
         autoSwitch.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            autoSwitch.isChecked = isCaptureServiceEnabled()
+            if (isCaptureServiceEnabled()) {
+                sendBroadcast(Intent(OfferCaptureService.ACTION_DISABLE_SELF).setPackage(packageName))
+                autoSwitch.isChecked = false
+            } else {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
         }
         bubbleSwitch.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
