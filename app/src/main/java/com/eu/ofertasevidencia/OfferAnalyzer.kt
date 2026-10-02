@@ -22,7 +22,9 @@ object OfferAnalyzer {
         /** Suma de todos los tiempos (recogida + viaje) en minutos. */
         val totalMinutes: Double? = null,
         /** Suma de las dos distancias que muestra Uber (recogida + viaje) en millas. */
-        val totalMiles: Double? = null
+        val totalMiles: Double? = null,
+        /** Identidad estable de la oferta (precio + recogida) para el anti-duplicado. Null si no se pudo extraer. */
+        val offerKey: String? = null
     )
 
     fun analyze(parts: List<String>): Result {
@@ -35,10 +37,12 @@ object OfferAnalyzer {
         val lower = normalized.lowercase(Locale.ROOT)
         val keywordScore = offerWords.count { Regex("(^|[^a-záéíóúüñ])${Regex.escape(it)}([^a-záéíóúüñ]|$)").containsMatchIn(lower) }
         val hasAction = listOf("aceptar", "rechazar", "accept", "decline", "match").any { lower.contains(it) }
+        // Sin la insignia UberX no hay oferta: es la condición obligatoria que elimina los falsos positivos.
+        val hasUberX = Regex("\\buber\\s?x\\b", RegexOption.IGNORE_CASE).containsMatchIn(lower)
         val hasMoney = money.containsMatchIn(lower)
         val hasDistance = distance.containsMatchIn(lower)
         val score = keywordScore + (if (hasAction) 2 else 0) + (if (hasMoney) 2 else 0) + (if (hasDistance) 1 else 0)
-        val isOffer = normalized.length >= 15 && hasAction && score >= 4
+        val isOffer = normalized.length >= 15 && hasAction && hasUberX && score >= 4
         val price = money.find(lower)?.value?.let(::parseNumber)
         val miles = distance.findAll(lower).mapNotNull { m ->
             val num = parseNumber(m.value) ?: return@mapNotNull null
@@ -53,8 +57,30 @@ object OfferAnalyzer {
             isOffer, normalized, normalized.take(220), sha256(normalized.toByteArray()),
             price,
             minutes.takeIf { it.isNotEmpty() }?.sum(),
-            miles.takeIf { it.isNotEmpty() }?.sum()
+            miles.takeIf { it.isNotEmpty() }?.sum(),
+            buildOfferKey(price, normalized)
         )
+    }
+
+    private val pickupLine = Regex(
+        "\\b\\d+\\s*mins?\\s*\\([\\d.,]+\\s*mi\\)\\s*([^|]{3,80})",
+        RegexOption.IGNORE_CASE
+    )
+
+    /**
+     * Clave estable de la oferta: precio + dirección de recogida.
+     * El temporizador y la hora cambian el texto en cada lectura, pero el precio
+     * y la recogida no, así se reconoce la misma tarjeta aunque se inspeccione varias veces.
+     */
+    fun buildOfferKey(price: Double?, normalized: String): String? {
+        if (price == null) return null
+        val pickup = pickupLine.find(normalized)?.groupValues?.getOrNull(1) ?: return null
+        val clean = pickup.lowercase(Locale.ROOT)
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim().take(48)
+        if (clean.length < 4) return null
+        return String.format(Locale.US, "%.2f|%s", price, clean)
     }
 
     /** True si el texto del OCR indica una oferta "exclusive" de UberX (cuadrado azul). */

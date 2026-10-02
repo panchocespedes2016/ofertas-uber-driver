@@ -9,5 +9,6 @@ data class OfferRecord(
     val screenshotPath: String,
     val screenshotSha256: String,
     val textSha256: String,
-    val automatic: Boolean
+    val automatic: Boolean,
+    val offerKey: String
 )

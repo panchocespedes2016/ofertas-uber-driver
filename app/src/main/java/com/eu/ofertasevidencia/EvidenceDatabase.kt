@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evidence.db", null, 1) {
+class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evidence.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """CREATE TABLE offers (
@@ -17,14 +17,21 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
                 screenshot_path TEXT NOT NULL,
                 screenshot_sha256 TEXT NOT NULL,
                 text_sha256 TEXT NOT NULL,
-                automatic INTEGER NOT NULL
+                automatic INTEGER NOT NULL,
+                offer_key TEXT NOT NULL DEFAULT ''
             )"""
         )
         db.execSQL("CREATE INDEX offers_time_idx ON offers(captured_at DESC)")
         db.execSQL("CREATE INDEX offers_text_hash_idx ON offers(text_sha256)")
+        db.execSQL("CREATE INDEX offers_key_idx ON offers(offer_key)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE offers ADD COLUMN offer_key TEXT NOT NULL DEFAULT ''")
+            db.execSQL("CREATE INDEX offers_key_idx ON offers(offer_key)")
+        }
+    }
 
     fun insert(record: OfferRecord): Long {
         val values = ContentValues().apply {
@@ -36,6 +43,7 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
             put("screenshot_sha256", record.screenshotSha256)
             put("text_sha256", record.textSha256)
             put("automatic", if (record.automatic) 1 else 0)
+            put("offer_key", record.offerKey)
         }
         return writableDatabase.insertOrThrow("offers", null, values)
     }
@@ -47,16 +55,26 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
         ).use { return it.moveToFirst() }
     }
 
+    /** True si ya se guardó una oferta con la misma identidad (precio + recogida) desde [after]. */
+    fun hasOfferKeySince(key: String, after: Long): Boolean {
+        if (key.isBlank()) return false
+        readableDatabase.rawQuery(
+            "SELECT 1 FROM offers WHERE offer_key=? AND captured_at>=? LIMIT 1",
+            arrayOf(key, after.toString())
+        ).use { return it.moveToFirst() }
+    }
+
     fun all(): List<OfferRecord> {
         val result = mutableListOf<OfferRecord>()
         readableDatabase.rawQuery(
-            "SELECT id,captured_at,package_name,summary,raw_text,screenshot_path,screenshot_sha256,text_sha256,automatic FROM offers ORDER BY captured_at DESC",
+            "SELECT id,captured_at,package_name,summary,raw_text,screenshot_path,screenshot_sha256,text_sha256,automatic,offer_key FROM offers ORDER BY captured_at DESC",
             null
         ).use { c ->
             while (c.moveToNext()) {
                 result += OfferRecord(
                     c.getLong(0), c.getLong(1), c.getString(2), c.getString(3),
-                    c.getString(4), c.getString(5), c.getString(6), c.getString(7), c.getInt(8) == 1
+                    c.getString(4), c.getString(5), c.getString(6), c.getString(7), c.getInt(8) == 1,
+                    c.getString(9) ?: ""
                 )
             }
         }

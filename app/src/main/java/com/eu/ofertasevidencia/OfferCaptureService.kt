@@ -479,7 +479,15 @@ class OfferCaptureService : AccessibilityService() {
                                     onDone(null)
                                     return@recognizeText
                                 }
-                                if (database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)) {
+                                // Anti-duplicado por identidad de la oferta (precio + recogida): la misma
+                                // tarjeta se inspecciona varias veces mientras el temporizador avanza, pero una
+                                // oferta nueva (distinto precio o recogida) se guarda aunque llegue segundos después.
+                                val offerKey = analysis.offerKey
+                                val dup = if (offerKey != null)
+                                    database.hasOfferKeySince(offerKey, System.currentTimeMillis() - 120_000L)
+                                else
+                                    database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)
+                                if (dup) {
                                     onDone(analysis)
                                     return@recognizeText
                                 }
@@ -592,7 +600,7 @@ class OfferCaptureService : AccessibilityService() {
             }
             val id = database.insert(
                 OfferRecord(0, capturedAt, packageName, analysis.summary, analysis.normalized,
-                    path, imageHash, analysis.hash, automatic)
+                    path, imageHash, analysis.hash, automatic, analysis.offerKey ?: "")
             )
             SavedEvidence(id, path)
         }.getOrElse { SavedEvidence(-1L, null) }
