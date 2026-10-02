@@ -531,6 +531,15 @@ class OfferCaptureService : AccessibilityService() {
 
                 override fun onFailure(errorCode: Int) {
                     captureInProgress = false
+                    // 0=error interno (p. ej. FLAG_SECURE), 1=capturas muy seguidas, 2=display inválido
+                    android.util.Log.e("OfferCapture", "takeScreenshot falló, error=$errorCode")
+                    handler.post {
+                        Toast.makeText(
+                            this@OfferCaptureService,
+                            "Captura falló (error $errorCode)",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                     if (!automatic) {
                         tapAcceptRandom()
                         Toast.makeText(this@OfferCaptureService, "Oferta aceptada", Toast.LENGTH_SHORT).show()
