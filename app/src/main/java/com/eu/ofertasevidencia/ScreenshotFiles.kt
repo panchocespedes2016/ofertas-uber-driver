@@ -7,6 +7,9 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Las capturas se guardan en la galería del teléfono (carpeta "EvidenciaOfertas",
@@ -17,10 +20,17 @@ import java.io.File
 object ScreenshotFiles {
     private const val RELATIVE_DIR = "Pictures/EvidenciaOfertas"
 
+    /** Nombre de archivo: yyyymmdd-hhmmss-auto/manual-exclusivo.png */
+    fun fileName(capturedAt: Long, automatic: Boolean): String {
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(capturedAt))
+        val mode = if (automatic) "auto" else "manual"
+        return "$stamp-$mode-exclusivo.png"
+    }
+
     /** Guarda el bitmap en la galería. Devuelve el content:// URI o null si falla. */
-    fun saveToGallery(context: Context, bitmap: Bitmap, capturedAt: Long): Uri? {
+    fun saveToGallery(context: Context, bitmap: Bitmap, capturedAt: Long, automatic: Boolean): Uri? {
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "oferta_${capturedAt}.png")
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(capturedAt, automatic))
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(MediaStore.Images.Media.RELATIVE_PATH, RELATIVE_DIR)
         }
@@ -39,9 +49,9 @@ object ScreenshotFiles {
     }
 
     /** Mueve un PNG existente (ruta de archivo) a la galería. Devuelve el content:// URI o null. */
-    fun moveFileToGallery(context: Context, file: File, capturedAt: Long): Uri? {
+    fun moveFileToGallery(context: Context, file: File, capturedAt: Long, automatic: Boolean): Uri? {
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "oferta_${capturedAt}.png")
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(capturedAt, automatic))
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(MediaStore.Images.Media.RELATIVE_PATH, RELATIVE_DIR)
         }

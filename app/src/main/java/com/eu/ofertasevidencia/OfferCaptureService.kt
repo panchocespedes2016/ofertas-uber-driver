@@ -560,7 +560,7 @@ class OfferCaptureService : AccessibilityService() {
     ): Long {
         return runCatching {
             // Carpeta visible en la galería; si falla, reserva en almacenamiento privado.
-            val galleryUri = ScreenshotFiles.saveToGallery(this, bitmap, capturedAt)
+            val galleryUri = ScreenshotFiles.saveToGallery(this, bitmap, capturedAt, automatic)
             val path: String
             val imageHash: String
             if (galleryUri != null) {
@@ -569,7 +569,7 @@ class OfferCaptureService : AccessibilityService() {
             } else {
                 val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(capturedAt))
                 val dir = File(filesDir, "evidence/$day").apply { mkdirs() }
-                val file = File(dir, "oferta_${capturedAt}.png")
+                val file = File(dir, ScreenshotFiles.fileName(capturedAt, automatic))
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 path = file.absolutePath
                 imageHash = OfferAnalyzer.sha256(file.readBytes())
