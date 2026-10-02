@@ -75,6 +75,46 @@ class OfferCaptureService : AccessibilityService() {
     // OCR en el teléfono: lee la oferta de la imagen porque Uber no expone texto
     private val ocrClient by lazy { TextRecognition.getClient(TextRecognizerOptions.Builder().build()) }
 
+    /**
+     * Diagnóstico (solo lectura): vuelca el texto del árbol de accesibilidad a
+     * nodos.log, en la misma carpeta que errores.log. Sirve para saber si Uber
+     * expone el texto de la oferta sin necesidad del OCR. No interfiere con la
+     * captura: se ejecuta en paralelo al flujo normal.
+     */
+    private fun dumpNodeTree(root: AccessibilityNodeInfo, tag: String) {
+        val sb = StringBuilder()
+        var count = 0
+        fun walk(node: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 12 || count > 400) return
+            try {
+                val text = node.text?.toString()?.trim().orEmpty()
+                val desc = node.contentDescription?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty() || desc.isNotEmpty()) {
+                    count++
+                    if (sb.length < 6000) {
+                        sb.append("d$depth ${node.className} | $text | $desc\n")
+                    }
+                }
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i) ?: continue
+                    try {
+                        walk(child, depth + 1)
+                    } finally {
+                        child.recycle()
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+        try {
+            walk(root, 0)
+        } catch (_: Exception) { }
+        val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        ScreenshotFiles.appendLog(
+            this, "nodos.log",
+            "$stamp [$tag] nodos_con_texto=$count\n$sb---\n".take(8000)
+        )
+    }
+
     private fun recognizeText(bitmap: Bitmap, onResult: (String) -> Unit) {
         runCatching {
             ocrClient.process(InputImage.fromBitmap(bitmap, 0))
@@ -458,6 +498,9 @@ class OfferCaptureService : AccessibilityService() {
 
         captureInProgress = true
         val capturedAt = System.currentTimeMillis()
+        // Diagnóstico en paralelo: vuelca el árbol de accesibilidad a nodos.log
+        // (misma carpeta que errores.log). Solo lectura, no afecta la captura.
+        runCatching { dumpNodeTree(root, if (automatic) "auto" else "manual") }
         takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor,
             object : AccessibilityService.TakeScreenshotCallback {
                 override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
