@@ -84,10 +84,10 @@ class OfferCaptureService : AccessibilityService() {
     }
 
     // Anclas de la tarjeta de oferta: la insignia "UberX" marca el borde superior
-    // y el botón "Accept"/"Aceptar" el borde inferior. Todo lo que esté fuera
-    // (p. ej. los textos del mapa) se ignora.
+    // y el botón "Accept"/"Aceptar"/"Match" el borde inferior. Todo lo que esté fuera
+    // (p. ej. los textos del mapa o el banner de navegación) se ignora.
     private val offerTopAnchor = Regex("\\bUber[A-Za-z]*\\b", RegexOption.IGNORE_CASE)
-    private val offerBottomAnchor = Regex("\\b(Accept|Aceptar)\\b", RegexOption.IGNORE_CASE)
+    private val offerBottomAnchor = Regex("\\b(Accept|Aceptar|Match)\\b", RegexOption.IGNORE_CASE)
 
     /**
      * Devuelve solo el texto dentro de la tarjeta de oferta: desde la insignia

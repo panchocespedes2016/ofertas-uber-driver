@@ -63,22 +63,26 @@ object OfferAnalyzer {
     }
 
     private val pickupLine = Regex(
-        "\\b\\d+\\s*mins?\\s*\\([\\d.,]+\\s*mi\\)\\s*([^|]{3,80})",
+        "\\b\\d+\\s*mins?\\s*\\([\\d.,]+\\s*mi\\)\\s*([^|]+?)(?=\\s*\\d+\\s*mins?\\s*\\(|\\||$)",
         RegexOption.IGNORE_CASE
     )
 
     /**
-     * Clave estable de la oferta: precio + dirección de recogida.
+     * Clave estable de la oferta: precio + dirección de recogida (sin el destino).
      * El temporizador y la hora cambian el texto en cada lectura, pero el precio
      * y la recogida no, así se reconoce la misma tarjeta aunque se inspeccione varias veces.
      */
     fun buildOfferKey(price: Double?, normalized: String): String? {
         if (price == null) return null
-        val pickup = pickupLine.find(normalized)?.groupValues?.getOrNull(1) ?: return null
+        // El "Avg. wait time at pickup: N min" puede cambiar entre lecturas: fuera de la clave.
+        val forKey = normalized.replace(
+            Regex("avg\\.?\\s*wait\\s*time\\s*at\\s*pickup:\\s*\\d+\\s*mins?", RegexOption.IGNORE_CASE), " "
+        )
+        val pickup = pickupLine.find(forKey)?.groupValues?.getOrNull(1) ?: return null
         val clean = pickup.lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9 ]"), " ")
             .replace(Regex("\\s+"), " ")
-            .trim().take(48)
+            .trim().take(40)
         if (clean.length < 4) return null
         return String.format(Locale.US, "%.2f|%s", price, clean)
     }
