@@ -212,7 +212,7 @@ class OfferCaptureService : AccessibilityService() {
         val metricsView = TextView(this).apply {
             setBackgroundResource(R.drawable.bubble_pill)
             setTextColor(Color.WHITE)
-            textSize = 14f
+            textSize = 20f
             setPadding(dpToPx(12), 0, dpToPx(12), 0)
             gravity = Gravity.CENTER_VERTICAL
             visibility = View.GONE
@@ -354,7 +354,7 @@ class OfferCaptureService : AccessibilityService() {
         bubbleExpandedExtra = pillWidth - sizePx
         runCatching { windowManager.updateViewLayout(layout, params) }
         handler.removeCallbacks(collapseBubbleRunnable)
-        handler.postDelayed(collapseBubbleRunnable, 6000)
+        handler.postDelayed(collapseBubbleRunnable, 10000)
     }
 
     private fun collapseBubble() {
@@ -499,6 +499,11 @@ class OfferCaptureService : AccessibilityService() {
                                 }
                                 saveEvidence(bitmap, capturedAt, packageName, analysis, true,
                                     OfferAnalyzer.isExclusive(analysis.normalized))
+                                // Confirmación visual: los $/h y $/mi también en automático,
+                                // para saber que la cogió sin abrir la app.
+                                offerMetrics(analysis)?.let { (perHour, perMile) ->
+                                    handler.post { showBubbleMetrics(perHour, perMile) }
+                                }
                                 onDone(analysis)
                             } finally {
                                 bitmap.recycle()
