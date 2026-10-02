@@ -64,6 +64,21 @@ class EvidenceDatabase(context: Context) : SQLiteOpenHelper(context, "offer_evid
         ).use { return it.moveToFirst() }
     }
 
+    data class OldEntry(val id: Long, val screenshotPath: String)
+
+    /** Los registros más viejos que sobran si se conservan solo los [keep] más recientes. */
+    fun beyondLimit(keep: Int): List<OldEntry> {
+        if (keep <= 0) return emptyList()
+        val out = mutableListOf<OldEntry>()
+        readableDatabase.rawQuery(
+            "SELECT id,screenshot_path FROM offers ORDER BY captured_at DESC LIMIT -1 OFFSET ?",
+            arrayOf(keep.toString())
+        ).use { c ->
+            while (c.moveToNext()) out += OldEntry(c.getLong(0), c.getString(1))
+        }
+        return out
+    }
+
     fun all(): List<OfferRecord> {
         val result = mutableListOf<OfferRecord>()
         readableDatabase.rawQuery(

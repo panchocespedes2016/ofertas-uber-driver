@@ -29,6 +29,7 @@ class ConfigActivity : Activity() {
     private lateinit var sizeSeek: SeekBar
     private lateinit var alphaLabel: TextView
     private lateinit var alphaSeek: SeekBar
+    private lateinit var limitButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +90,8 @@ class ConfigActivity : Activity() {
 
         findViewById<Button>(R.id.exportButton).setOnClickListener { exportCsv() }
         findViewById<Button>(R.id.deleteButton).setOnClickListener { confirmDeleteAll() }
+        limitButton = findViewById(R.id.limitButton)
+        limitButton.setOnClickListener { chooseLimit() }
 
         BottomNav.bind(this, BottomNav.CONFIG)
     }
@@ -103,6 +106,7 @@ class ConfigActivity : Activity() {
         val alphaPct = prefs.getInt("bubble_alpha_pct", 85)
         alphaSeek.progress = alphaPct - 30
         alphaLabel.text = "Opacidad del botón flotante: ${alphaPct}%"
+        updateLimitLabel()
     }
 
     private fun isCaptureServiceEnabled(): Boolean {
@@ -142,6 +146,43 @@ class ConfigActivity : Activity() {
     }
 
     private fun csv(value: String): String = "\"${value.replace("\"", "\"\"")}\""
+
+    private fun updateLimitLabel() {
+        val limit = prefs.getInt("image_limit", 500)
+        limitButton.text = if (limit <= 0) "Sin límite" else limit.toString()
+    }
+
+    private fun chooseLimit() {
+        val options = arrayOf("100", "200", "500", "1000", "Sin límite")
+        val values = intArrayOf(100, 200, 500, 1000, 0)
+        val current = prefs.getInt("image_limit", 500)
+        val checked = values.indexOf(current).takeIf { it >= 0 } ?: 2
+        AlertDialog.Builder(this)
+            .setTitle("Límite de imágenes guardadas")
+            .setSingleChoiceItems(options, checked) { dialog, which ->
+                prefs.edit().putInt("image_limit", values[which]).apply()
+                updateLimitLabel()
+                pruneNow()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    /** Borra de inmediato lo que sobre si el nuevo límite es menor que lo guardado. */
+    private fun pruneNow() {
+        val limit = prefs.getInt("image_limit", 500)
+        if (limit <= 0) return
+        var removed = 0
+        database.beyondLimit(limit).forEach { old ->
+            ScreenshotFiles.delete(this, old.screenshotPath)
+            database.deleteById(old.id)
+            removed++
+        }
+        if (removed > 0) {
+            Toast.makeText(this, "$removed capturas viejas eliminadas", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private fun confirmDeleteAll() {
         AlertDialog.Builder(this)

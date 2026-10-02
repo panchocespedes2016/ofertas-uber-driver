@@ -28,6 +28,7 @@ class CapturesActivity : Activity() {
     private lateinit var countText: TextView
     private lateinit var listView: ListView
     private var records: List<OfferRecord> = emptyList()
+    private val expandedIds = mutableSetOf<Long>()
     private val dateFormat = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,6 +72,18 @@ class CapturesActivity : Activity() {
             }
             view.findViewById<TextView>(R.id.summaryText).text =
                 (if (record.screenshotPath.isBlank()) "Solo texto · " else "Contiene · ") + record.summary
+            // Resumen colapsado por defecto; el "+" lo expande sin abrir el detalle
+            val summaryView = view.findViewById<TextView>(R.id.summaryText)
+            val expandBtn = view.findViewById<ImageButton>(R.id.expandBtn)
+            val expanded = expandedIds.contains(record.id)
+            summaryView.visibility = if (expanded) View.VISIBLE else View.GONE
+            expandBtn.rotation = if (expanded) 45f else 0f
+            expandBtn.contentDescription = if (expanded) "Ocultar datos" else "Ver más datos"
+            expandBtn.setOnClickListener {
+                if (expandedIds.contains(record.id)) expandedIds.remove(record.id)
+                else expandedIds.add(record.id)
+                notifyDataSetChanged()
+            }
             loadThumbnail(record.screenshotPath, view.findViewById(R.id.thumb))
             view.findViewById<ImageButton>(R.id.shareBtn).setOnClickListener { shareCapture(record) }
             view.findViewById<ImageButton>(R.id.deleteBtn).setOnClickListener { confirmDelete(record) }

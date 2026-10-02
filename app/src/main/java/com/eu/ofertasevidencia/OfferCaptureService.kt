@@ -602,8 +602,19 @@ class OfferCaptureService : AccessibilityService() {
                 OfferRecord(0, capturedAt, packageName, analysis.summary, analysis.normalized,
                     path, imageHash, analysis.hash, automatic, analysis.offerKey ?: "")
             )
+            pruneOldImages()
             SavedEvidence(id, path)
         }.getOrElse { SavedEvidence(-1L, null) }
+    }
+
+    /** Si se alcanzó el límite de imágenes guardadas, borra las más viejas (registro + archivo). */
+    private fun pruneOldImages() {
+        val limit = prefs.getInt("image_limit", 500)
+        if (limit <= 0) return
+        database.beyondLimit(limit).forEach { old ->
+            ScreenshotFiles.delete(this, old.screenshotPath)
+            database.deleteById(old.id)
+        }
     }
 
     private data class SavedEvidence(val id: Long, val path: String?)
