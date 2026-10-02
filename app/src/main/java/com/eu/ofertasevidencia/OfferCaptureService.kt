@@ -163,9 +163,14 @@ class OfferCaptureService : AccessibilityService() {
         if (!isUberDriverPackage(packageName)) return
         // La captura automática se puede pausar desde Config sin apagar el servicio
         if (!prefs.getBoolean("auto_enabled", true)) return
-        pendingCheck?.let(handler::removeCallbacks)
-        pendingCheck = Runnable { inspectCurrentWindow(automatic = true) }.also {
-            handler.postDelayed(it, 550)
+        // Disparo al PRIMER evento: si ya hay una inspección en camino no se pospone.
+        // (Antes cada evento reiniciaba los 550 ms y con el temporizador de la oferta
+        // generando eventos constantes, la captura llegaba cuando la tarjeta ya se iba.)
+        if (pendingCheck == null) {
+            pendingCheck = Runnable {
+                pendingCheck = null
+                inspectCurrentWindow(automatic = true)
+            }.also { handler.postDelayed(it, 400) }
         }
     }
 
@@ -173,6 +178,7 @@ class OfferCaptureService : AccessibilityService() {
 
     override fun onDestroy() {
         pendingCheck?.let(handler::removeCallbacks)
+        pendingCheck = null
         handler.removeCallbacks(collapseBubbleRunnable)
         runCatching { unregisterReceiver(manualReceiver) }
         runCatching { prefs.unregisterOnSharedPreferenceChangeListener(prefsListener) }
