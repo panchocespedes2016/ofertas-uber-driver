@@ -1,5 +1,6 @@
 package com.eu.ofertasevidencia
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
@@ -89,6 +90,38 @@ object ScreenshotFiles {
                 val renamed = File(file.parent, displayName)
                 if (file.renameTo(renamed)) renamed.absolutePath else null
             }.getOrNull()
+        }
+    }
+
+    /**
+     * Agrega una línea al archivo de log en Documents/EvidenciaOfertas (lo crea si no existe).
+     * Sirve para registrar errores de captura sin que el usuario tenga que mirar el teléfono.
+     */
+    fun appendLog(context: Context, displayName: String, line: String) {
+        runCatching {
+            val resolver = context.contentResolver
+            val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val relativeDir = "Documents/EvidenciaOfertas"
+            val existingId = resolver.query(
+                collection,
+                arrayOf(MediaStore.Files.FileColumns._ID),
+                "${MediaStore.Files.FileColumns.DISPLAY_NAME}=? AND ${MediaStore.Files.FileColumns.RELATIVE_PATH}=?",
+                arrayOf(displayName, "$relativeDir/"),
+                null
+            )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+            val uri = if (existingId != null) {
+                ContentUris.withAppendedId(collection, existingId)
+            } else {
+                val values = ContentValues().apply {
+                    put(MediaStore.Files.FileColumns.DISPLAY_NAME, displayName)
+                    put(MediaStore.Files.FileColumns.MIME_TYPE, "text/plain")
+                    put(MediaStore.Files.FileColumns.RELATIVE_PATH, relativeDir)
+                }
+                resolver.insert(collection, values) ?: return
+            }
+            resolver.openOutputStream(uri, "wa")?.use { out ->
+                out.write((line + "\n").toByteArray())
+            }
         }
     }
 

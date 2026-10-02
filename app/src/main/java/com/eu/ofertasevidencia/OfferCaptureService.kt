@@ -542,6 +542,12 @@ class OfferCaptureService : AccessibilityService() {
                     captureInProgress = false
                     // 0=error interno (p. ej. FLAG_SECURE), 1=capturas muy seguidas, 2=display inválido
                     android.util.Log.e("OfferCapture", "takeScreenshot falló, error=$errorCode")
+                    // Log en archivo para revisarlo después (el usuario puede estar manejando)
+                    val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+                    ScreenshotFiles.appendLog(
+                        this@OfferCaptureService, "errores.log",
+                        "$stamp takeScreenshot error=$errorCode automatic=$automatic"
+                    )
                     handler.post {
                         Toast.makeText(
                             this@OfferCaptureService,
