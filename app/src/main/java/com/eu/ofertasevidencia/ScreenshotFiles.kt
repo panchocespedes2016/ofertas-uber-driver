@@ -20,17 +20,18 @@ import java.util.Locale
 object ScreenshotFiles {
     private const val RELATIVE_DIR = "Pictures/EvidenciaOfertas"
 
-    /** Nombre de archivo: yyyymmdd-hhmmss-auto/manual-exclusivo.png */
-    fun fileName(capturedAt: Long, automatic: Boolean): String {
+    /** Nombre de archivo: yyyymmdd-hhmmss-auto/manual-exclusivo|match.png */
+    fun fileName(capturedAt: Long, automatic: Boolean, isExclusive: Boolean): String {
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(capturedAt))
         val mode = if (automatic) "auto" else "manual"
-        return "$stamp-$mode-exclusivo.png"
+        val kind = if (isExclusive) "exclusivo" else "match"
+        return "$stamp-$mode-$kind.png"
     }
 
     /** Guarda el bitmap en la galería. Devuelve el content:// URI o null si falla. */
-    fun saveToGallery(context: Context, bitmap: Bitmap, capturedAt: Long, automatic: Boolean): Uri? {
+    fun saveToGallery(context: Context, bitmap: Bitmap, capturedAt: Long, automatic: Boolean, isExclusive: Boolean): Uri? {
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(capturedAt, automatic))
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(capturedAt, automatic, isExclusive))
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(MediaStore.Images.Media.RELATIVE_PATH, RELATIVE_DIR)
         }
@@ -49,9 +50,9 @@ object ScreenshotFiles {
     }
 
     /** Mueve un PNG existente (ruta de archivo) a la galería. Devuelve el content:// URI o null. */
-    fun moveFileToGallery(context: Context, file: File, capturedAt: Long, automatic: Boolean): Uri? {
+    fun moveFileToGallery(context: Context, file: File, capturedAt: Long, automatic: Boolean, isExclusive: Boolean): Uri? {
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(capturedAt, automatic))
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName(capturedAt, automatic, isExclusive))
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(MediaStore.Images.Media.RELATIVE_PATH, RELATIVE_DIR)
         }
@@ -67,6 +68,28 @@ object ScreenshotFiles {
             return null
         }
         return uri
+    }
+
+    /**
+     * Renombra un PNG ya guardado (galería o ruta de archivo) al [displayName] dado.
+     * Devuelve la nueva ruta (para la galería, el mismo content:// URI) o null si falla.
+     */
+    fun rename(context: Context, path: String, displayName: String): String? {
+        if (path.isBlank()) return null
+        return if (path.startsWith("content://")) {
+            runCatching {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                }
+                if (context.contentResolver.update(Uri.parse(path), values, null, null) > 0) path else null
+            }.getOrNull()
+        } else {
+            runCatching {
+                val file = File(path)
+                val renamed = File(file.parent, displayName)
+                if (file.renameTo(renamed)) renamed.absolutePath else null
+            }.getOrNull()
+        }
     }
 
     fun exists(context: Context, path: String): Boolean {

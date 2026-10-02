@@ -483,7 +483,8 @@ class OfferCaptureService : AccessibilityService() {
                                     onDone(analysis)
                                     return@recognizeText
                                 }
-                                saveEvidence(bitmap, capturedAt, packageName, analysis, true)
+                                saveEvidence(bitmap, capturedAt, packageName, analysis, true,
+                                    OfferAnalyzer.isExclusive(analysis.normalized))
                                 onDone(analysis)
                             } finally {
                                 bitmap.recycle()
@@ -496,12 +497,12 @@ class OfferCaptureService : AccessibilityService() {
                             isOffer = false, normalized = "", summary = "",
                             hash = OfferAnalyzer.sha256("manual-$capturedAt".toByteArray())
                         )
-                        val id = saveEvidence(bitmap, capturedAt, packageName, placeholder, false)
+                        val saved = saveEvidence(bitmap, capturedAt, packageName, placeholder, false, isExclusive = false)
                         captureInProgress = false
                         tapAcceptRandom()
                         Toast.makeText(this@OfferCaptureService, "Oferta aceptada", Toast.LENGTH_SHORT).show()
                         onDone(placeholder)
-                        if (id == -1L) {
+                        if (saved.id == -1L) {
                             bitmap.recycle()
                         } else {
                             recognizeText(bitmap) { ocrText ->
@@ -510,11 +511,19 @@ class OfferCaptureService : AccessibilityService() {
                                         val analysis = OfferAnalyzer.analyze(listOf(ocrText))
                                         if (database.isDuplicate(analysis.hash, System.currentTimeMillis() - 30_000L)) {
                                             // La misma oferta ya se guardó hace segundos: quitar el duplicado
-                                            database.deleteById(id)?.let { path ->
+                                            database.deleteById(saved.id)?.let { path ->
                                                 ScreenshotFiles.delete(this@OfferCaptureService, path)
                                             }
                                         } else {
-                                            database.updateOcrText(id, analysis.summary, ocrText, analysis.hash)
+                                            database.updateOcrText(saved.id, analysis.summary, ocrText, analysis.hash)
+                                            // El OCR llega después del guardado: si es exclusive, renombrar el archivo
+                                            if (OfferAnalyzer.isExclusive(ocrText)) {
+                                                val newName = ScreenshotFiles.fileName(capturedAt, false, isExclusive = true)
+                                                saved.path?.let { p ->
+                                                    ScreenshotFiles.rename(this@OfferCaptureService, p, newName)
+                                                        ?.let { newPath -> database.updateScreenshotPath(saved.id, newPath) }
+                                                }
+                                            }
                                         }
                                         offerMetrics(analysis)?.let { (perHour, perMile) ->
                                             handler.post { showBubbleMetrics(perHour, perMile) }
@@ -550,17 +559,18 @@ class OfferCaptureService : AccessibilityService() {
         )
     }
 
-    /** Guarda la captura y devuelve el id del registro, o -1 si falló. */
+    /** Guarda la captura y devuelve el id del registro y la ruta, o id=-1 si falló. */
     private fun saveEvidence(
         bitmap: Bitmap,
         capturedAt: Long,
         packageName: String,
         analysis: OfferAnalyzer.Result,
-        automatic: Boolean
-    ): Long {
+        automatic: Boolean,
+        isExclusive: Boolean
+    ): SavedEvidence {
         return runCatching {
             // Carpeta visible en la galería; si falla, reserva en almacenamiento privado.
-            val galleryUri = ScreenshotFiles.saveToGallery(this, bitmap, capturedAt, automatic)
+            val galleryUri = ScreenshotFiles.saveToGallery(this, bitmap, capturedAt, automatic, isExclusive)
             val path: String
             val imageHash: String
             if (galleryUri != null) {
@@ -569,17 +579,20 @@ class OfferCaptureService : AccessibilityService() {
             } else {
                 val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(capturedAt))
                 val dir = File(filesDir, "evidence/$day").apply { mkdirs() }
-                val file = File(dir, ScreenshotFiles.fileName(capturedAt, automatic))
+                val file = File(dir, ScreenshotFiles.fileName(capturedAt, automatic, isExclusive))
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 path = file.absolutePath
                 imageHash = OfferAnalyzer.sha256(file.readBytes())
             }
-            database.insert(
+            val id = database.insert(
                 OfferRecord(0, capturedAt, packageName, analysis.summary, analysis.normalized,
                     path, imageHash, analysis.hash, automatic)
             )
-        }.getOrElse { -1L }
+            SavedEvidence(id, path)
+        }.getOrElse { SavedEvidence(-1L, null) }
     }
+
+    private data class SavedEvidence(val id: Long, val path: String?)
 
     private fun isUberDriverPackage(name: String): Boolean {
         val lower = name.lowercase(Locale.ROOT)

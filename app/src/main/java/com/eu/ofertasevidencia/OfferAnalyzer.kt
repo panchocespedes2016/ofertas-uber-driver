@@ -57,6 +57,10 @@ object OfferAnalyzer {
         )
     }
 
+    /** True si el texto del OCR indica una oferta "exclusive" de UberX (cuadrado azul). */
+    fun isExclusive(text: String): Boolean =
+        Regex("\\bexclusive\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)
+
     /** Extrae el número de un texto como "$12.50", "12,50", "10.2 mi" o "25 min". */
     private fun parseNumber(raw: String): Double? {
         val cleaned = raw.filter { it.isDigit() || it == '.' || it == ',' }

@@ -62,7 +62,10 @@ class MainActivity : Activity() {
             if (path.isBlank() || path.startsWith("content://")) continue
             val file = File(path)
             if (!file.exists()) continue
-            val uri = ScreenshotFiles.moveFileToGallery(this, file, record.capturedAt, record.automatic) ?: continue
+            val uri = ScreenshotFiles.moveFileToGallery(
+                this, file, record.capturedAt, record.automatic,
+                OfferAnalyzer.isExclusive(record.rawText)
+            ) ?: continue
             database.updateScreenshotPath(record.id, uri.toString())
             file.delete()
             moved++
