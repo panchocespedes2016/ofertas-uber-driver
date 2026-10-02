@@ -8,7 +8,10 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
@@ -29,7 +32,9 @@ class ConfigActivity : Activity() {
     private lateinit var sizeSeek: SeekBar
     private lateinit var alphaLabel: TextView
     private lateinit var alphaSeek: SeekBar
-    private lateinit var limitButton: Button
+    private lateinit var limitEdit: EditText
+    private lateinit var limitMinus: Button
+    private lateinit var limitPlus: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,8 +95,20 @@ class ConfigActivity : Activity() {
 
         findViewById<Button>(R.id.exportButton).setOnClickListener { exportCsv() }
         findViewById<Button>(R.id.deleteButton).setOnClickListener { confirmDeleteAll() }
-        limitButton = findViewById(R.id.limitButton)
-        limitButton.setOnClickListener { chooseLimit() }
+        limitEdit = findViewById(R.id.limitEdit)
+        limitMinus = findViewById(R.id.limitMinus)
+        limitPlus = findViewById(R.id.limitPlus)
+        limitMinus.setOnClickListener { stepLimit(-50) }
+        limitPlus.setOnClickListener { stepLimit(50) }
+        limitEdit.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                applyLimitEdit()
+                true
+            } else false
+        }
+        limitEdit.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) applyLimitEdit()
+        }
 
         BottomNav.bind(this, BottomNav.CONFIG)
     }
@@ -106,7 +123,7 @@ class ConfigActivity : Activity() {
         val alphaPct = prefs.getInt("bubble_alpha_pct", 85)
         alphaSeek.progress = alphaPct - 30
         alphaLabel.text = "Opacidad del botón flotante: ${alphaPct}%"
-        updateLimitLabel()
+        updateLimitField()
     }
 
     private fun isCaptureServiceEnabled(): Boolean {
@@ -147,26 +164,28 @@ class ConfigActivity : Activity() {
 
     private fun csv(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 
-    private fun updateLimitLabel() {
-        val limit = prefs.getInt("image_limit", 500)
-        limitButton.text = if (limit <= 0) "Sin límite" else limit.toString()
+    private fun updateLimitField() {
+        limitEdit.setText(prefs.getInt("image_limit", 500).toString())
     }
 
-    private fun chooseLimit() {
-        val options = arrayOf("100", "200", "500", "1000", "Sin límite")
-        val values = intArrayOf(100, 200, 500, 1000, 0)
-        val current = prefs.getInt("image_limit", 500)
-        val checked = values.indexOf(current).takeIf { it >= 0 } ?: 2
-        AlertDialog.Builder(this)
-            .setTitle("Límite de imágenes guardadas")
-            .setSingleChoiceItems(options, checked) { dialog, which ->
-                prefs.edit().putInt("image_limit", values[which]).apply()
-                updateLimitLabel()
-                pruneNow()
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
+    private fun setLimit(value: Int) {
+        val v = value.coerceAtLeast(0)
+        prefs.edit().putInt("image_limit", v).apply()
+        updateLimitField()
+        pruneNow()
+    }
+
+    private fun stepLimit(delta: Int) {
+        setLimit(prefs.getInt("image_limit", 500) + delta)
+    }
+
+    /** Aplica lo escrito a mano al confirmar el teclado o salir del campo. */
+    private fun applyLimitEdit() {
+        val v = limitEdit.text.toString().toIntOrNull() ?: run {
+            updateLimitField()
+            return
+        }
+        setLimit(v)
     }
 
     /** Borra de inmediato lo que sobre si el nuevo límite es menor que lo guardado. */
